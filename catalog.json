@@ -1,0 +1,442 @@
+{
+  "_nota": "Fuente de verdad de precios. Datos tomados de https://www.clotta.com.ar (oct 2026). price = precio de lista en ARS; el precio por transferencia es price * (1 - store.transferDiscount). colors/sizes vacios = sin selector en el carrito.",
+  "store": {
+    "name": "CLOTTA",
+    "tagline": "Ropa y accesorios",
+    "city": "Córdoba, Argentina",
+    "address": "Av. Richieri 2872, local 5, Barrio Jardín",
+    "whatsapp": "543516176285",
+    "whatsappDisplay": "+54 351 6176285",
+    "email": "clotta.fashionco@gmail.com",
+    "currency": "ARS",
+    "transferDiscount": 0.2,
+    "installments": 3,
+    "liveStore": "https://www.clotta.com.ar"
+  },
+  "categories": [
+    {
+      "id": "remeras",
+      "name": "Remeras y blusas"
+    },
+    {
+      "id": "sastreria",
+      "name": "Sastrería"
+    },
+    {
+      "id": "denim",
+      "name": "Denim"
+    },
+    {
+      "id": "abrigos",
+      "name": "Abrigos"
+    },
+    {
+      "id": "carteras",
+      "name": "Carteras"
+    }
+  ],
+  "editorial": {
+    "heroNavy": "img/clotta-ss2026-new-collection.webp",
+    "heroWhite": "img/clotta-ss2026-new-collection-blanco.webp",
+    "slides": [
+      "img/2-slide-1788476783888-4869233137-b177aed536ec8c7f8031d3e611656c7e1788476784-1024-1024.webp",
+      "img/2-slide-1788476783889-846201854-46ef04b255c4450a678e799d28d4bb8c1788476785-1024-1024.webp"
+    ],
+    "reels": [
+      {
+        "url": "https://www.instagram.com/p/DdrIry9SJTk/"
+      }
+    ]
+  },
+  "products": [
+    {
+      "id": "blusa-rapsodia",
+      "name": "Blusa Rapsodia",
+      "category": "remeras",
+      "price": 38000,
+      "colorCount": 3,
+      "colors": [
+        "Chocolate",
+        "Blanco",
+        "Negro"
+      ],
+      "sizes": [
+        "Único"
+      ],
+      "slug": "blusa-rapsodia-18eir",
+      "featured": true,
+      "inStock": true,
+      "description": "Blusa de tela cey, escote en V con puntilla, manga 3/4 y lazo en espalda.",
+      "images": [
+        "img/blusarapsodia_2-c6e05a1fc17461ed3a17872386317054-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "blusa-canela",
+      "name": "Blusa Canela",
+      "category": "remeras",
+      "price": 40800,
+      "colorCount": 2,
+      "colors": [
+        "Blanco",
+        "Negro"
+      ],
+      "sizes": [
+        "Único"
+      ],
+      "slug": "blusa-canela-hxat9",
+      "featured": false,
+      "inStock": true,
+      "description": "Musculosa escote en V, frunces en hombros y tira en espalda para regular el escote. Detalle de foil en toda la prenda. Talle único: abarca hasta un talle L.",
+      "images": [
+        "img/blusacanela_1-726edc260ba50b246b17908642689503-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "remera-st-barth",
+      "name": "Remera St Barth",
+      "category": "remeras",
+      "price": 30800,
+      "colorCount": 1,
+      "colors": [
+        "Celeste"
+      ],
+      "sizes": [
+        "S",
+        "M",
+        "L"
+      ],
+      "slug": "remera-st-barth-jpbf9",
+      "featured": true,
+      "inStock": false,
+      "description": "Remera de lycra de algodón estampada, manga corta y cuello a la base en contratono.",
+      "images": [
+        "img/remerastbarth_2-d029749ef9933ae6a817878425468668-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "remera-ersea",
+      "name": "Remera Ersea",
+      "category": "remeras",
+      "price": 32800,
+      "colorCount": 3,
+      "colors": [
+        "Rayas chocolate",
+        "Rayas azules",
+        "Rayas rojas"
+      ],
+      "sizes": [
+        "Único"
+      ],
+      "slug": "remerea-ersea-8hyyb",
+      "featured": false,
+      "inStock": false,
+      "description": "Remera m/c de algodón rayada, con rib de cuello a contratono.",
+      "images": [
+        "img/remereaersea_1-1fe415a1a01e10aede17883567306341-1024-1024.webp",
+        "img/remereaersea_2-3e23bd9c71f82aef7717883567321061-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "chaleco-venezia",
+      "name": "Chaleco Venezia",
+      "category": "sastreria",
+      "price": 46800,
+      "colorCount": 1,
+      "colors": [
+        "Beige"
+      ],
+      "sizes": [],
+      "slug": "chaleco-venezia-1kubf",
+      "featured": true,
+      "inStock": false,
+      "description": "Chaleco de hilo con escote en V y bordes de escote en contratono.",
+      "images": [
+        "img/chalecovenezia_2-99354daaca0c8cbc4d17885343546072-1024-1024.webp",
+        "img/chalecovenezia_3-d363dd8ea4b3ef24cf17885343560596-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "chaleco-malaga",
+      "name": "Chaleco Malaga",
+      "category": "sastreria",
+      "price": 46800,
+      "colorCount": 3,
+      "colors": [
+        "Gris",
+        "Beige",
+        "Negro"
+      ],
+      "sizes": [],
+      "slug": "chaleco-malaga-tvper",
+      "featured": true,
+      "inStock": true,
+      "description": "Chaleco de bremer con escote a la base y estampado de rombos.",
+      "images": [
+        "img/chalecomalaga_2-9498ac836a711fc91417885339541987-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "blazer-molina",
+      "name": "Blazer Molina",
+      "category": "sastreria",
+      "price": 94800,
+      "colorCount": 2,
+      "colors": [
+        "Beige",
+        "Chocolate"
+      ],
+      "sizes": [
+        "1",
+        "2",
+        "3"
+      ],
+      "slug": "blazer-molina-ezfof",
+      "featured": false,
+      "inStock": true,
+      "description": "Blazer forrado en tela tencel, con hombreras.",
+      "images": [
+        "img/blazermolina_2-d4582c70be9c141dfb17907743532673-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "pantalon-jamaica",
+      "name": "Pantalón Jamaica",
+      "category": "sastreria",
+      "price": 59800,
+      "colorCount": 3,
+      "colors": [
+        "Beige",
+        "Chocolate",
+        "Natural"
+      ],
+      "sizes": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
+      ],
+      "slug": "pantalon-jamaica-12ec4",
+      "featured": false,
+      "inStock": true,
+      "description": "Pantalón recto de tela tencel.",
+      "images": [
+        "img/pantalonjamaica_1_cho-5dcdc2874a8b506baf17749092269986-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "babucha-indiana",
+      "name": "Babucha Indiana",
+      "category": "sastreria",
+      "price": 79800,
+      "colorCount": 1,
+      "colors": [
+        "Negro"
+      ],
+      "sizes": [],
+      "slug": "babucha-indiana-1tttw",
+      "featured": false,
+      "inStock": true,
+      "description": "Babucha de encaje con short de lycra.",
+      "images": [
+        "img/babuchaindiana_2-dcc73cddac6b6add8a17931986294589-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "jeans-light-denim",
+      "name": "Jeans Light Denim",
+      "category": "denim",
+      "price": 81200,
+      "colorCount": 1,
+      "colors": [
+        "Celeste denim"
+      ],
+      "sizes": [
+        "36",
+        "38",
+        "40",
+        "42",
+        "44",
+        "46"
+      ],
+      "slug": "jeans-light-denim-1w3ne",
+      "featured": true,
+      "inStock": true,
+      "description": "Jeans rígido wide leg, corte crop, en celeste denim.",
+      "images": [
+        "img/jeanslightdenim_1-1797fd709ea32c658d17880459394149-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "bermuda-denim-cristal",
+      "name": "Bermuda Denim Cristal",
+      "category": "denim",
+      "price": 75800,
+      "colorCount": 1,
+      "colors": [
+        "Celeste denim"
+      ],
+      "sizes": [
+        "36",
+        "38",
+        "40",
+        "42",
+        "44"
+      ],
+      "slug": "bermuda-denim-cristal-m84pb",
+      "featured": false,
+      "inStock": true,
+      "description": "Bermuda de jeans clásica, desflecada en los extremos.",
+      "images": [
+        "img/bermudadenimcristal_2-ff03f895705897cd0317907823353013-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "chaqueta-boston",
+      "name": "Chaqueta Boston",
+      "category": "abrigos",
+      "price": 110800,
+      "colorCount": 3,
+      "colors": [
+        "Negro",
+        "Chocolate",
+        "Blanco"
+      ],
+      "sizes": [
+        "S",
+        "M",
+        "L"
+      ],
+      "slug": "chaqueta-boston-w8cmv",
+      "featured": false,
+      "inStock": true,
+      "description": "Campera de gabardina rígida.",
+      "images": [
+        "img/chaquetaboston_1-015d668ac702a8660817928810775872-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "chaqueta-bomber-checks",
+      "name": "Chaqueta Bomber Checks",
+      "category": "abrigos",
+      "price": 108000,
+      "colorCount": 1,
+      "colors": [
+        "Cuadros celeste"
+      ],
+      "sizes": [
+        "S",
+        "M",
+        "L"
+      ],
+      "slug": "chaqueta-bomber-checks-xvpf9",
+      "featured": true,
+      "inStock": true,
+      "description": "Chaqueta bomber de tela poplin a cuadros, con solapa en el cierre y bolsillos frontales.",
+      "images": [
+        "img/chaquetabomberchecks_1_cuadch-882c5ed040b11e7b3717897371183197-1024-1024.webp",
+        "img/chaquetabomberchecks_2_cuadch-f530d2e035224118fa17897371201249-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "bolso-jazmin",
+      "name": "Bolso Jazmín",
+      "category": "carteras",
+      "price": 119800,
+      "colorCount": 1,
+      "colors": [
+        "Chocolate"
+      ],
+      "sizes": [],
+      "slug": "bolso-jazmin-5k40h",
+      "featured": false,
+      "inStock": true,
+      "description": "Bolso tote de superficie texturada, con dos asas cortas.",
+      "images": [
+        "img/bolsojazmin_1-ba3fcd40b3e43f182217801495739463-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "bolso-cayetana",
+      "name": "Bolso Cayetana",
+      "category": "carteras",
+      "price": 70800,
+      "colorCount": 1,
+      "colors": [
+        "Camel"
+      ],
+      "sizes": [],
+      "slug": "bolso-cayetana-gjimd",
+      "featured": false,
+      "inStock": true,
+      "description": "Bolso tote con bolsillo frontal, bolsillo con cierre y correa ancha.",
+      "images": [
+        "img/bolsocayetana_2-ff1c166f7cac2f257a17801500343966-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "cartera-catherina",
+      "name": "Cartera Catherina",
+      "category": "carteras",
+      "price": 115800,
+      "colorCount": 2,
+      "colors": [
+        "Chocolate",
+        "Negro"
+      ],
+      "sizes": [],
+      "slug": "cartera-catherina-1nhr8",
+      "featured": false,
+      "inStock": true,
+      "description": "Cartera de mano con asas cortas y detalle de ojalillos metálicos en un lateral.",
+      "images": [
+        "img/carteracatherina_2-19607db0c7e027313217801500035000-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "mochila-donna",
+      "name": "Mochila Donna",
+      "category": "carteras",
+      "price": 58900,
+      "colorCount": 2,
+      "colors": [
+        "Negro",
+        "Borgoña"
+      ],
+      "sizes": [],
+      "slug": "mochila-donna-1ug82",
+      "featured": false,
+      "inStock": true,
+      "description": "Mochila acolchada con bolsillo frontal con cierre y asas cortas.",
+      "images": [
+        "img/mochiladonna_2-158fbc049342cd720c17801495147142-1024-1024.webp"
+      ]
+    },
+    {
+      "id": "rinonera-triana",
+      "name": "Riñonera Triana",
+      "category": "carteras",
+      "price": 49800,
+      "colorCount": 3,
+      "colors": [
+        "Verde",
+        "Negro",
+        "Chocolate"
+      ],
+      "sizes": [],
+      "slug": "rinonera-triana-2coba",
+      "featured": false,
+      "inStock": true,
+      "description": "Riñonera de tela con cierre y bolsillo frontal.",
+      "images": [
+        "img/ric391oneratriana_1-183c7a1ab006dff1be17800967635707-1024-1024.webp"
+      ]
+    }
+  ]
+}
