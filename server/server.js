@@ -369,6 +369,24 @@ function createApp({
     });
   });
 
+  // Paginas de la tienda que genera generar-paginas.js: coleccion.html y una por categoria (denim.html, ...).
+  // Solo se sirve un nombre que salga del catalogo, nunca un archivo cualquiera de la raiz.
+  app.get(/^\/([a-z0-9-]+)\.html$/, (req, res, next) => {
+    const slug = req.params[0];
+    let allowed = slug === 'coleccion';
+    if (!allowed) {
+      try {
+        allowed = editor.view().categories.some((c) => c.id === slug);
+      } catch {
+        allowed = false;
+      }
+    }
+    if (!allowed) return next();
+    return res.sendFile(path.join(rootDir, `${slug}.html`), { dotfiles: 'ignore', headers: { 'Cache-Control': 'no-cache' } }, (err) => {
+      if (err && !res.headersSent) next();
+    });
+  });
+
   // Imagenes subidas desde el panel: nombre aleatorio e inmutable, asi que cache largo.
   app.use(
     '/uploads',

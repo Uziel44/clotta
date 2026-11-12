@@ -28,12 +28,16 @@ function initialDraft() {
 
 const S = {
   store: {}, categories: [], editorial: {}, products: [], byId: new Map(),
-  filter: { cat: 'all', favs: false, sort: 'featured' },
+  filter: { cat: document.body.dataset.page === 'categoria' ? (document.body.dataset.cat || 'all') : 'all', favs: false, sort: 'featured' },
   step: 'review', draft: initialDraft(),
   cart: [], favs: new Set(storage.get(KEYS.favs, [])),
   money: new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }),
   busy: false
 };
+
+// Páginas: index.html (portada), coleccion.html (todo) y una por categoría (denim.html, ...), generadas por generar-paginas.js.
+const PAGE = document.body.dataset.page || 'home'; // home | coleccion | categoria
+const pageFor = id => (id === 'all' ? 'coleccion.html' : `${id}.html`);
 
 /* ---------- Helpers de dominio ---------- */
 const money = n => S.money.format(n);
@@ -68,6 +72,8 @@ function hydrate(data) {
   S.money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: S.store.currency || 'ARS', maximumFractionDigits: 0 });
   S.cart = sanitizeCart(storage.get(KEYS.cart, []));
   S.favs = new Set([...S.favs].filter(id => S.byId.has(id)));
+  if (!S.categories.some(c => c.id === S.filter.cat)) S.filter.cat = 'all';
+  if (PAGE === 'coleccion' && new URLSearchParams(location.search).get('favs') === '1' && S.favs.size) S.filter.favs = true;
   renderAll();
   injectJSONLD();
 }
@@ -93,28 +99,29 @@ function showLoadError(e) {
       <button class="btn" type="button" data-act="retry">Reintentar</button>
       <p class="muted">También podés escribirnos por <a href="https://wa.me/543516176285" target="_blank" rel="noopener">WhatsApp</a>.</p>
     </div>`;
-  $('#grid').innerHTML = html;
-  $('#rail').innerHTML = '';
-  $('#resultCount').textContent = '';
+  const grid = $('#grid'), rail = $('#rail'), count = $('#resultCount');
+  if (grid) grid.innerHTML = html;
+  if (rail) rail.innerHTML = '';
+  if (count) count.textContent = '';
   console.error('[CLOTTA] catálogo:', e);
 }
 
 function renderSkeletons() {
-  $('#grid').innerHTML = Array.from({ length: 8 }, () => '<div><div class="skel"></div></div>').join('');
-  $('#rail').innerHTML = Array.from({ length: 5 }, () => '<div class="card"><div class="skel"></div></div>').join('');
+  const grid = $('#grid'), rail = $('#rail');
+  if (grid) grid.innerHTML = Array.from({ length: 8 }, () => '<div><div class="skel"></div></div>').join('');
+  if (rail) rail.innerHTML = Array.from({ length: 5 }, () => '<div class="card"><div class="skel"></div></div>').join('');
 }
 
 /* ---------- Render ---------- */
 function renderAll() {
   bindStatic();
   renderNav();
-  renderCats();
-  renderRail();
-  renderChips();
-  renderGrid();
-  renderTiles();
-  renderReels();
-  renderBenefits();
+  // Cada página tiene solo algunas secciones: se dibuja lo que existe.
+  if ($('#cats')) renderCats();
+  if ($('#rail')) renderRail();
+  if ($('#grid')) renderGrid();
+  if ($('#reels')) renderReels();
+  if ($('#benefits')) renderBenefits();
   renderFooter();
   renderCounts();
   renderCart();
@@ -125,8 +132,8 @@ function bindStatic() {
   $$('[data-b="installments"]').forEach(n => { n.textContent = S.store.installments ?? 3; });
   $$('[data-b="waLink"]').forEach(n => { n.href = waLink('Hola CLOTTA! Quiero hacer una consulta.'); });
   $$('[data-b="waNews"]').forEach(n => { n.href = waLink('Hola! Quiero enterarme de las novedades de Clotta'); });
-  const hero = S.editorial.heroNavy;
-  if (hero && !$('#heroImg').src.endsWith(hero)) $('#heroImg').src = hero;
+  const hero = S.editorial.heroNavy, heroImg = $('#heroImg'); // la imagen de portada solo está en index.html
+  if (hero && heroImg && !heroImg.src.endsWith(hero)) heroImg.src = hero;
   layoutPromo(); // el descuento y las cuotas pueden cambiar el ancho de la lista
 }
 
@@ -159,8 +166,8 @@ addEventListener('resize', updateNavFade);
 function renderNav() {
   const items = [{ id: 'all', name: 'Todo' }, ...S.categories.filter(c => S.products.some(p => p.category === c.id))];
   $('#catNav').innerHTML = items.map(c => {
-    const on = !S.filter.favs && S.filter.cat === c.id;
-    return `<li><button type="button" data-act="cat" data-cat="${esc(c.id)}"${on ? ' aria-current="true"' : ''}>${esc(c.name)}</button></li>`;
+    const on = PAGE !== 'home' && !S.filter.favs && S.filter.cat === c.id;
+    return `<li><a href="${esc(pageFor(c.id))}"${on ? ' aria-current="page"' : ''}>${esc(c.name)}</a></li>`;
   }).join('');
   updateNavFade();
 }
@@ -174,7 +181,6 @@ function cardHTML(p) {
   const [a, b] = p.images || [];
   const fav = S.favs.has(p.id);
   const out = !inStock(p);
-  const nColors = p.colors?.length || p.colorCount || 0;
   return `<article class="card${out ? ' is-out' : ''}" data-pid="${esc(p.id)}">
     <div class="card__media">
       <button class="card__img" type="button" data-act="open" tabindex="-1" aria-hidden="true">
@@ -183,10 +189,11 @@ function cardHTML(p) {
       </button>
       ${out ? '<span class="badge">Sin stock</span>' : ''}
       <button class="fav" type="button" data-act="fav" aria-pressed="${fav}" aria-label="Guardar ${esc(p.name)} en favoritos">${icon('heart')}</button>
-      <button class="quick" type="button" data-act="quick"${out ? ' disabled' : ''} aria-label="${needsChoice(p) ? 'Elegir talle y color de' : 'Agregar al carrito:'} ${esc(p.name)}">${icon('plus')}</button>
-      <div class="card__info">
+    </div>
+    <div class="card__info">
+      <div class="card__row">
         <h3 class="card__title"><button class="card__name" type="button" data-act="open">${esc(p.name)}</button></h3>
-        ${nColors > 1 ? `<p class="card__meta">${nColors} colores</p>` : ''}
+        <button class="quick" type="button" data-act="quick"${out ? ' disabled' : ''} aria-label="${needsChoice(p) ? 'Elegir talle y color de' : 'Agregar al carrito:'} ${esc(p.name)}">${icon('bag')}</button>
       </div>
     </div>
   </article>`;
@@ -196,16 +203,6 @@ function renderRail() {
   let list = S.products.filter(p => p.featured);
   if (!list.length) list = S.products.slice(0, 8);
   $('#rail').innerHTML = [...list].sort(byStock).map(cardHTML).join('');
-}
-
-function renderChips() {
-  const count = id => id === 'all' ? S.products.length : S.products.filter(p => p.category === id).length;
-  const chips = [{ id: 'all', name: 'Todo' }, ...S.categories.filter(c => count(c.id))].map(c =>
-    `<button class="chip" type="button" data-act="cat" data-cat="${esc(c.id)}" aria-pressed="${!S.filter.favs && S.filter.cat === c.id}">${esc(c.name)}</button>`);
-  if (S.favs.size || S.filter.favs) {
-    chips.push(`<button class="chip" type="button" data-act="favs-filter" aria-pressed="${S.filter.favs}">Favoritos</button>`);
-  }
-  $('#chips').innerHTML = chips.join('');
 }
 
 function visibleProducts() {
@@ -220,11 +217,13 @@ function visibleProducts() {
 
 function renderGrid() {
   const list = visibleProducts();
+  const title = $('#colT');
+  if (title) title.textContent = S.filter.favs ? 'Favoritos' : S.filter.cat === 'all' ? 'Toda la colección' : catName(S.filter.cat);
   $('#resultCount').textContent = list.length === 1 ? '1 prenda' : `${list.length} prendas`;
   if (!list.length) {
-    $('#grid').innerHTML = S.filter.favs
-      ? `<div class="state"><p>Todavía no guardaste favoritos. Tocá el corazón de una prenda para verla acá.</p><button class="btn btn--ghost" type="button" data-act="cat" data-cat="all">Ver toda la colección</button></div>`
-      : `<div class="state"><p>No hay prendas en esta categoría por ahora.</p><button class="btn btn--ghost" type="button" data-act="cat" data-cat="all">Ver toda la colección</button></div>`;
+    $('#grid').innerHTML = `<div class="state"><p>${S.filter.favs
+      ? 'Todavía no guardaste favoritos. Tocá el corazón de una prenda para verla acá.'
+      : 'No hay prendas en esta categoría por ahora.'}</p><a class="btn btn--ghost" href="${pageFor('all')}">Ver toda la colección</a></div>`;
     return;
   }
   const wa = S.filter.favs ? '' : `<div class="wa-card" id="waCard">
@@ -244,29 +243,17 @@ function fillWA() {
   const rem = (g.children.length - 1) % cols;
   w.style.gridColumn = `span ${rem === 0 ? cols : cols - rem}`;
 }
-new ResizeObserver(fillWA).observe($('#grid'));
+if ($('#grid')) new ResizeObserver(fillWA).observe($('#grid'));
 
 // Franja de categorías bajo el hero, de borde a borde: la primera foto de cada categoría y su nombre en un recuadro.
 function renderCats() {
   $('#cats').innerHTML = S.categories.map(c => {
     const cover = S.products.find(p => p.category === c.id && p.images?.[0])?.images[0];
     if (!cover) return '';
-    return `<button class="cats__item" type="button" data-act="cat" data-cat="${esc(c.id)}">
+    return `<a class="cats__item" href="${esc(pageFor(c.id))}">
       <img src="${esc(cover)}" alt="" width="1024" height="1280" loading="lazy" decoding="async">
       <span class="cats__label">${esc(c.name)}</span>
-    </button>`;
-  }).join('');
-}
-
-function renderTiles() {
-  $('#tiles').innerHTML = S.categories.map(c => {
-    const items = S.products.filter(p => p.category === c.id);
-    if (!items.length) return '';
-    const cover = items.find(p => p.images?.[0])?.images[0];
-    return `<button class="tile" type="button" data-act="cat" data-cat="${esc(c.id)}">
-      <span class="tile__img">${cover ? `<img src="${esc(cover)}" alt="" width="480" height="640" loading="lazy" decoding="async">` : ''}</span>
-      <span class="tile__cap"><span class="tile__title display">${esc(c.name)}</span><span class="tile__count">${items.length === 1 ? '1 prenda' : items.length + ' prendas'}</span></span>
-    </button>`;
+    </a>`;
   }).join('');
 }
 
@@ -333,14 +320,14 @@ function renderFooter() {
   const cats = S.categories.filter(c => S.products.some(p => p.category === c.id));
   $('#footGrid').innerHTML = `
     <div>
-      <a class="logo" href="#top" aria-label="${esc(st.name || 'CLOTTA')}, ir al inicio"><img src="img/logo.webp" alt="" width="480" height="208"></a>
+      <a class="logo" href="index.html" aria-label="${esc(st.name || 'CLOTTA')}, ir al inicio"><img src="img/logo.webp" alt="" width="480" height="208"></a>
       <p>${esc(st.tagline || '')}${st.city ? '. ' + esc(st.city) + '.' : ''}</p>
     </div>
     <div>
       <h2>Comprar</h2>
       <ul>
-        <li><a href="#coleccion" data-act="cat" data-cat="all">Toda la colección</a></li>
-        ${cats.map(c => `<li><a href="#coleccion" data-act="cat" data-cat="${esc(c.id)}">${esc(c.name)}</a></li>`).join('')}
+        <li><a href="${pageFor('all')}">Toda la colección</a></li>
+        ${cats.map(c => `<li><a href="${esc(pageFor(c.id))}">${esc(c.name)}</a></li>`).join('')}
       </ul>
     </div>
     <div id="envios">
@@ -455,7 +442,7 @@ function toggleFav(id) {
   const p = S.byId.get(id);
   announce(S.favs.has(id) ? `${p.name} guardado en favoritos.` : `${p.name} quitado de favoritos.`);
   if (S.filter.favs && !S.favs.size) S.filter.favs = false;
-  renderCounts(); renderChips(); renderNav();
+  renderCounts(); renderNav();
   $$(`[data-pid="${CSS.escape(id)}"] .fav`).forEach(b => b.setAttribute('aria-pressed', S.favs.has(id)));
   if (S.filter.favs) renderGrid();
 }
@@ -811,11 +798,13 @@ function handleReturn() {
 }
 
 /* ---------- Filtros y navegación ---------- */
-function setCategory(id, { scroll = true } = {}) {
-  S.filter.cat = S.categories.some(c => c.id === id) ? id : 'all';
+// "Ver la colección": en coleccion.html se queda y quita el filtro de favoritos; en otra página, va a coleccion.html.
+function goAll() {
+  if ($('#cartD').open) $('#cartD').close();
+  if (PAGE !== 'coleccion') { location.assign(pageFor('all')); return; }
   S.filter.favs = false;
-  renderNav(); renderChips(); renderGrid();
-  if (scroll) $('#coleccion').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
+  renderNav(); renderGrid();
+  window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
 }
 
 /* ---------- Eventos ---------- */
@@ -829,7 +818,7 @@ document.addEventListener('click', e => {
     else if (act === 'next') goStep('details');
     else if (act === 'back') { syncDraft(); goStep('review'); }
     else if (act === 'transfer') payTransfer();
-    else if (act === 'shop') { $('#cartD').close(); setCategory('all'); }
+    else if (act === 'shop') goAll();
     return;
   }
   const t = e.target.closest('[data-act]');
@@ -840,12 +829,11 @@ document.addEventListener('click', e => {
     case 'open': return openProduct(id);
     case 'quick': return quickAdd(id);
     case 'fav': return toggleFav(id);
-    case 'cat': e.preventDefault(); return setCategory(t.dataset.cat);
-    case 'shop': e.preventDefault(); return setCategory('all');
-    case 'favs-filter': S.filter.favs = !S.filter.favs; renderNav(); renderChips(); renderGrid(); return;
+    case 'shop': e.preventDefault(); return goAll();
     case 'favs':
       if (!S.favs.size) { toast('Todavía no guardaste favoritos. Tocá el corazón de una prenda.'); return; }
-      S.filter.favs = true; renderNav(); renderChips(); renderGrid();
+      if (PAGE !== 'coleccion') { location.assign(`${pageFor('all')}?favs=1`); return; }
+      S.filter.favs = true; renderNav(); renderGrid();
       return $('#coleccion').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
     case 'cart': S.step = 'review'; renderCart(); return openDialog($('#cartD'));
     case 'close': return t.closest('dialog')?.close();
@@ -899,7 +887,7 @@ document.addEventListener('input', e => {
   if (el.getAttribute('aria-invalid') === 'true') { el.setAttribute('aria-invalid', 'false'); $(`#f-${k}-err`).textContent = ''; }
 });
 
-$('#sort').addEventListener('change', e => { S.filter.sort = e.target.value; renderGrid(); });
+$('#sort')?.addEventListener('change', e => { S.filter.sort = e.target.value; renderGrid(); });
 
 /* ---------- JSON-LD (generado desde el catálogo) ---------- */
 function injectJSONLD() {

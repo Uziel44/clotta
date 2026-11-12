@@ -82,6 +82,16 @@ ngrok http 3000     # copiá la URL https que muestra
 
 Después, en *Tus integraciones > Webhooks* configurá `https://<ngrok>/api/webhook` (evento **Pagos**), copiá la clave secreta a `MP_WEBHOOK_SECRET` y reiniciá. El botón *Simular notificación* del panel sirve para validar la firma (el pago de prueba no existe: el server responde 200 `pago_inexistente`).
 
+## Páginas de la tienda
+
+`index.html` es la portada; `coleccion.html` y una página por categoría (`denim.html`, `abrigos.html`, ...) las **genera** `generar-paginas.js` (en la raíz del repo) a partir de `index.html` y `catalog.json`: copia el encabezado, el pie y los diálogos y cambia solo el listado y los datos de la página. Los productos los dibuja `app.js`.
+
+```bash
+node generar-paginas.js   # después de tocar el encabezado/pie de index.html o de agregar una categoría; commitear los .html
+```
+
+Los .html generados no se editan a mano. Una categoría nueva en `catalog.json` necesita correr el script y desplegar; el servidor ya sirve cualquier página que coincida con una categoría del catálogo.
+
 ## Panel (`/admin.html`)
 
 Mismo esquema de usuario que el panel de Bestia Parda: **un único usuario**, contraseña como **hash bcrypt** en `server/.env` y sesión con un JWT de 12 horas (límite de 10 intentos de login cada 15 min por IP). Como el hash tiene el mismo formato, se podría pegar el de Bestia Parda para usar la misma contraseña; lo mejor es generar uno propio:
@@ -109,7 +119,7 @@ Estos archivos son los **únicos** lugares con datos personales. Privacidad: ema
 
 ## Seguridad en una mirada
 
-- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/css/styles.css`, `/app.js`, `/metricas.js`, `/admin.html`, `/admin.css`, `/admin.js`, `/img/*.{webp,jpg,png,gif,avif,svg}` y `/uploads/<32 hex>.{jpg,png,webp}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
+- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/css/styles.css`, `/app.js`, `/metricas.js`, `/coleccion.html` y `/<categoría>.html` (solo nombres que salgan de `catalog.json`), `/admin.html`, `/admin.css`, `/admin.js`, `/img/*.{webp,jpg,png,gif,avif,svg}` y `/uploads/<32 hex>.{jpg,png,webp}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
 - Token y secret solo por entorno; los logs los redactan. Rate limit 20/min por IP en checkout. Cabeceras básicas (`nosniff`, `frame-ancestors 'none'`, HSTS si `PUBLIC_URL` es https).
 - Webhook: firma HMAC-SHA256 (`x-signature`) con comparación en tiempo constante; el payload no se usa, el estado se consulta a Mercado Pago. Ante un fallo de Mercado Pago responde 502 para que **reintente él**.
 

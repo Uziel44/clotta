@@ -487,3 +487,27 @@ test('syncRepoSections: copia tienda, categorías y portada del repo sin tocar l
   assert.equal(syncRepoSections(seed, live), false, 'sin cambios no reescribe');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---------------------------------------------------------------- paginas de categoria
+
+test('coleccion.html y <categoría>.html se sirven según el catálogo; otros .html de la raíz no', async () => {
+  const fixture = fixtureWithCatalog();
+  for (const f of ['coleccion', 'denim', 'secreto']) fs.writeFileSync(path.join(fixture.root, `${f}.html`), `<title>${f}</title>`);
+  const app = await startApp({ env: ENV, fixture });
+  try {
+    const get = async (route) => (await fetch(`${app.baseUrl}${route}`)).status;
+    assert.equal(await get('/coleccion.html'), 200);
+    assert.equal(await get('/denim.html'), 200);
+    assert.equal(await get('/remeras.html'), 404, 'es categoría pero el archivo no existe');
+    assert.equal(await get('/secreto.html'), 404, 'el archivo existe pero no es una categoría del catálogo');
+    for (const route of ['/..%2fsecreto.html', '/%2e%2e/secreto.html', '/denim.html/../secreto.html']) {
+      const res = await rawGet(app.port, route);
+      assert.notEqual(res.status, 200, route);
+    }
+    const res = await fetch(`${app.baseUrl}/denim.html`);
+    assert.equal(res.headers.get('cache-control'), 'no-cache');
+    assert.match(await res.text(), /<title>denim<\/title>/);
+  } finally {
+    await app.close();
+  }
+});

@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400..700&family=Hanken+Grotesk:wght@400..700&display=swap">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body data-page="home">
 <a class="skip" href="#main">Saltar al contenido</a>
 
 <svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
@@ -57,7 +57,7 @@
 
 <header class="site-head" id="top">
   <div class="wrap head__row">
-    <a class="logo" href="#top" aria-label="CLOTTA, ir al inicio"><img src="img/logo.webp" alt="" width="480" height="208"></a>
+    <a class="logo" href="index.html" aria-label="CLOTTA, ir al inicio"><img src="img/logo.webp" alt="" width="480" height="208"></a>
     <nav class="catnav" aria-label="Categorías"><ul id="catNav"></ul></nav>
     <div class="head__tools">
       <a class="icon-btn tool" id="userBtn" href="admin.html" aria-label="Ingresar al panel de la tienda">
@@ -91,8 +91,8 @@
     <div class="cats" id="cats"></div>
   </section>
 
-  <section class="block block--tight wrap" aria-labelledby="newT">
-    <div class="head-line">
+  <section class="block block--tight" aria-labelledby="newT">
+    <div class="head-line wrap">
       <h2 id="newT" class="display">Destacados</h2>
       <div class="rail-btns">
         <button class="icon-btn" type="button" data-act="rail-prev" aria-label="Ver anteriores"><svg class="ic" aria-hidden="true"><use href="#i-prev"/></svg></button>
@@ -100,28 +100,6 @@
       </div>
     </div>
     <div class="rail-wrap"><div class="rail" id="rail" tabindex="-1"></div></div>
-  </section>
-
-  <section class="block wrap" id="coleccion" aria-labelledby="colT">
-    <div class="head-line"><h2 id="colT" class="display">Toda la colección</h2></div>
-    <div class="bar">
-      <div class="chips" id="chips" role="group" aria-label="Filtrar por categoría"></div>
-      <label class="sort">Ordenar
-        <select id="sort">
-          <option value="featured">Destacados</option>
-          <option value="price-asc">Menor precio</option>
-          <option value="price-desc">Mayor precio</option>
-          <option value="az">A-Z</option>
-        </select>
-      </label>
-    </div>
-    <p class="result-count" id="resultCount" aria-live="polite"></p>
-    <div class="grid" id="grid"></div>
-  </section>
-
-  <section class="block block--tight wrap" aria-labelledby="tilesT">
-    <div class="head-line"><h2 id="tilesT" class="display">Mirá por tipo de prenda</h2></div>
-    <div class="tiles" id="tiles"></div>
   </section>
 
   <section class="block block--tight wrap" id="reels" aria-labelledby="reelT" hidden>
