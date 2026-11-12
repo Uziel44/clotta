@@ -1,0 +1,12 @@
+.git
+.gitignore
+.gitattributes
+.dockerignore
+Dockerfile
+**/node_modules
+server/.env
+server/.env.*
+server/data
+server/test
+**/*.md
+img/*.htm

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel — CLOTTA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400..700&family=Hanken+Grotesk:wght@400..700&display=swap">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">CLOTTA <span>Panel de la tienda</span></div>
+    <div class="top-actions">
+      <a class="link" href="/" target="_blank" rel="noopener">Ver la web</a>
+      <button class="btn ghost" id="logout" type="button" hidden>Salir</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ENTRAR -->
+  <section id="login" class="login-box">
+    <h1>Entrar</h1>
+    <form id="login-form" autocomplete="on">
+      <label for="login-user">Usuario</label>
+      <input id="login-user" name="usuario" type="text" autocomplete="username" autocapitalize="none" required>
+      <label for="login-pass">Contraseña</label>
+      <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+      <p class="msg" id="login-msg" role="alert"></p>
+      <button class="btn" id="login-send" type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <!-- PESTAÑAS -->
+  <nav id="tabs" class="tabs" aria-label="Secciones del panel" hidden>
+    <button class="tab" id="tab-productos" type="button" aria-pressed="true">Productos</button>
+    <button class="tab" id="tab-metricas" type="button" aria-pressed="false">Métricas</button>
+  </nav>
+
+  <!-- PANEL 1: PRODUCTOS -->
+  <section id="panel" hidden>
+    <div class="bar">
+      <h2>Tarjetas de productos</h2>
+      <button class="btn" id="nuevo" type="button">+ Nuevo producto</button>
+    </div>
+    <p class="muted small">Los cambios se ven en la web al instante y el precio que cargás es el que se cobra en el pago.</p>
+    <p class="muted" id="loading">Cargando…</p>
+    <p class="muted" id="empty" hidden>Todavía no hay productos. Creá el primero con “Nuevo producto”.</p>
+    <ul class="cards" id="list"></ul>
+    <p class="sr" id="aviso" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- PANEL 2: MÉTRICAS -->
+  <section id="panel-metricas" hidden>
+    <div class="bar">
+      <h2>Métricas <span class="muted small">últimos 30 días</span></h2>
+      <button class="btn ghost" id="metricas-refresh" type="button">Actualizar</button>
+    </div>
+    <p class="muted" id="metricas-loading" hidden>Cargando…</p>
+    <p class="msg" id="metricas-msg" role="alert"></p>
+    <div id="metricas-cuerpo"></div>
+  </section>
+
+</main>
+
+<!-- EDITOR -->
+<dialog id="editor" class="dlg" aria-labelledby="editor-titulo">
+  <form id="editor-form" method="dialog" novalidate>
+    <h2 id="editor-titulo">Producto</h2>
+
+    <label for="f-nombre">Nombre</label>
+    <input id="f-nombre" type="text" maxlength="120" required>
+
+    <div class="row2">
+      <div>
+        <label for="f-categoria">Categoría</label>
+        <select id="f-categoria" required></select>
+      </div>
+      <div>
+        <label for="f-precio">Precio de lista <span class="muted small">(pesos)</span></label>
+        <input id="f-precio" type="number" inputmode="numeric" min="1" step="1" required>
+        <p class="muted small" id="f-transfer"></p>
+      </div>
+    </div>
+
+    <label for="f-descripcion">Descripción <span class="muted small">(opcional)</span></label>
+    <textarea id="f-descripcion" rows="3" maxlength="1000"></textarea>
+
+    <div class="row2">
+      <div>
+        <label for="f-colores">Colores <span class="muted small">(separados por coma)</span></label>
+        <input id="f-colores" type="text" placeholder="Negro, Blanco, Chocolate">
+      </div>
+      <div>
+        <label for="f-talles">Talles <span class="muted small">(separados por coma)</span></label>
+        <input id="f-talles" type="text" placeholder="S, M, L">
+      </div>
+    </div>
+    <div id="f-ncolores-box" hidden>
+      <label for="f-ncolores">Cantidad de colores <span class="muted small">(si no los listás, la web avisa que se coordinan por WhatsApp)</span></label>
+      <input id="f-ncolores" type="number" inputmode="numeric" min="0" max="50" step="1">
+    </div>
+
+    <label>Imágenes <span class="muted small">(la primera es la principal; la segunda se ve al pasar el mouse)</span></label>
+    <ul class="imgs" id="imgs"></ul>
+    <div class="photo-actions">
+      <label class="btn ghost file" for="f-fotos">Agregar imágenes</label>
+      <input id="f-fotos" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+      <p class="muted small" id="fotos-msg"></p>
+    </div>
+
+    <label class="check"><input id="f-destacado" type="checkbox"> Destacado (aparece en la sección “Destacados” de la web)</label>
+    <label class="check"><input id="f-stock" type="checkbox" checked> Hay stock</label>
+
+    <p class="msg" id="editor-msg" role="alert"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" id="editor-cancelar" type="button">Cancelar</button>
+      <button class="btn" id="editor-guardar" type="submit">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- CONFIRMAR BORRADO -->
+<dialog id="confirm" class="dlg small-dlg" aria-labelledby="confirm-msg">
+  <p id="confirm-msg"></p>
+  <div class="dlg-actions">
+    <button class="btn ghost" id="confirm-no" type="button">Cancelar</button>
+    <button class="btn danger" id="confirm-si" type="button">Eliminar</button>
+  </div>
+</dialog>
+
+<script src="admin.js" defer></script>
+</body>
+</html>

@@ -24,6 +24,9 @@ Sin token el sitio funciona y `/api/checkout` responde 503 `pagos_no_configurado
 | `PORT` / `HOST` | Default `3000` / `127.0.0.1`. En el servidor, `HOST=0.0.0.0`. |
 | `ALLOWED_ORIGINS` | Orígenes CORS, separados por coma. Default Live Server `:5502`. `PUBLIC_URL` se suma sola. |
 | `TRUST_PROXY` | `1` detrás de Caddy, para que el rate limit vea la IP real. |
+| `ADMIN_PASSWORD_HASH` | Hash bcrypt de la contraseña del panel (`/admin.html`). Sin ella el panel queda **deshabilitado** (el sitio y los pagos siguen andando). Ver *Panel* más abajo. |
+| `ADMIN_USER` | Usuario del panel. Default `clotta`. |
+| `JWT_SECRET` | Firma las sesiones del panel (12 h). Si falta se genera uno al arrancar y las sesiones caducan en cada reinicio. |
 
 ## API
 
@@ -36,7 +39,8 @@ Sin token el sitio funciona y `/api/checkout` responde 503 `pagos_no_configurado
 | | `503 {error:"pagos_no_configurados"}` · `502 {code:"mp_error"}` (sin detalle interno) |
 | `GET /api/health` | `{ok:true, mpConfigured}` |
 | `POST /api/webhook` | lo llama Mercado Pago |
-| `GET /`, `/catalog.json`, `/img/*` | sitio (whitelist, ver abajo) |
+| `POST /api/metrics` `{tipo, visitanteId?, productoId?, origen?, dispositivo?}` | `201` · `400 evento_invalido` · `429` (lo llama `metricas.js`) |
+| `GET /`, `/catalog.json`, `/css/styles.css`, `/img/*`, `/metricas.js`, `/uploads/*`, `/admin.html` (+ `.css`/`.js`) | sitio (whitelist, ver abajo) |
 
 Ejemplo (bash; en PowerShell usá `curl.exe` con el JSON en un archivo y `-d "@pedido.json"`). Los `id`, talles y colores salen de `catalog.json`:
 
@@ -78,8 +82,26 @@ ngrok http 3000     # copiá la URL https que muestra
 
 Después, en *Tus integraciones > Webhooks* configurá `https://<ngrok>/api/webhook` (evento **Pagos**), copiá la clave secreta a `MP_WEBHOOK_SECRET` y reiniciá. El botón *Simular notificación* del panel sirve para validar la firma (el pago de prueba no existe: el server responde 200 `pago_inexistente`).
 
+## Panel (`/admin.html`)
+
+Mismo esquema de usuario que el panel de Bestia Parda: **un único usuario**, contraseña como **hash bcrypt** en `server/.env` y sesión con un JWT de 12 horas (límite de 10 intentos de login cada 15 min por IP). Como el hash tiene el mismo formato, se podría pegar el de Bestia Parda para usar la misma contraseña; lo mejor es generar uno propio:
+
+```bash
+cd server
+node -e "console.log(require('bcryptjs').hashSync('LA_NUEVA_CONTRASEÑA', 12))"
+```
+
+Pegá el resultado en `ADMIN_PASSWORD_HASH` de `server/.env`, definí también `JWT_SECRET` (cualquier texto largo y aleatorio) y reiniciá. El usuario es `clotta` salvo que definas `ADMIN_USER`. (`ADMIN_PASSWORD` en texto plano también funciona, pero solo sirve para desarrollo.)
+
+- **Productos:** crear, editar y eliminar tarjetas (nombre, categoría, precio, descripción, colores, talles, destacado, hay stock) y subir, quitar o reordenar sus imágenes (se redimensionan en el navegador; JPG/PNG/WebP, máx. 8 MB, hasta 8 por producto). Todo se guarda en `catalog.json`, que es la misma fuente de precios del checkout: **el precio que se carga en el panel es el que se cobra**. Se escribe de forma atómica y las ediciones corren de a una.
+- **Imágenes subidas:** van a `server/data/uploads/` (nombre aleatorio) y se sirven en `/uploads/<archivo>`; en `catalog.json` queda la ruta `uploads/<archivo>`. Si se quita una imagen y ningún otro producto la usa, el archivo se borra. Abrir la web con Live Server (`:5502`) no muestra las subidas: hay que entrar por este servidor.
+- **Métricas:** visitas, personas distintas, nuevas y recurrentes, visitas por día, embudo (entraron → abrieron un producto → carrito → pago), productos más vistos, agregados y vendidos, pagos aprobados y monto cobrado (de `orders.jsonl`), clics a WhatsApp, origen (`?utm_source=...` o sitio de referencia) y dispositivo, de los últimos 30 días. `metricas.js` manda los eventos sin IP ni datos personales (solo un identificador aleatorio por navegador); se conservan 90 días en `data/metrics.ndjson`. Las visitas desde el navegador donde se entró al panel no se cuentan.
+
+API del panel (todas con `Authorization: Bearer <token>`, salvo el login): `POST /api/login` `{usuario, password}` → `{token}` · `GET /api/admin/catalog` · `POST /api/admin/products` · `PUT|DELETE /api/admin/products/:id` · `POST /api/admin/images` (cuerpo binario `image/jpeg|png|webp`) · `GET /api/admin/metrics`. Errores: `{error, code, field?}`.
+
 ## Qué queda registrado (`server/data/`, fuera del repo)
 
+- `uploads/` y `metrics.ndjson`: imágenes subidas desde el panel y eventos anónimos de la web (ver *Panel*). Van en el backup y, si se usa Docker, en el volumen de `data/`.
 - `pending.jsonl`: carrito validado al crear la preferencia (items, total, `buyer` y `delivery` completos).
 - `orders.jsonl`: un renglón por pago **aprobado**, confirmado contra `GET /v1/payments/:id`, con el `buyer` y la `delivery` copiados del pedido pendiente (así se sabe a quién y adónde enviar). Idempotente por `paymentId`. Incluye `amountMatches` (monto cobrado vs. pedido) para detectar diferencias.
 
@@ -87,7 +109,7 @@ Estos archivos son los **únicos** lugares con datos personales. Privacidad: ema
 
 ## Seguridad en una mirada
 
-- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/img/*.{webp,jpg,png,gif,avif,svg}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
+- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/css/styles.css`, `/metricas.js`, `/admin.html`, `/admin.css`, `/admin.js`, `/img/*.{webp,jpg,png,gif,avif,svg}` y `/uploads/<32 hex>.{jpg,png,webp}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
 - Token y secret solo por entorno; los logs los redactan. Rate limit 20/min por IP en checkout. Cabeceras básicas (`nosniff`, `frame-ancestors 'none'`, HSTS si `PUBLIC_URL` es https).
 - Webhook: firma HMAC-SHA256 (`x-signature`) con comparación en tiempo constante; el payload no se usa, el estado se consulta a Mercado Pago. Ante un fallo de Mercado Pago responde 502 para que **reintente él**.
 
@@ -99,5 +121,6 @@ Estos archivos son los **únicos** lugares con datos personales. Privacidad: ema
 - Deploy detrás de Caddy con `HOST=0.0.0.0`, `TRUST_PROXY=1`, `PUBLIC_URL` https, token de producción y secret del webhook.
 - Aviso al negocio cuando entra un pago aprobado (hoy solo queda en `orders.jsonl`).
 - Reembolsos y contracargos (otros estados del pago): no se registran.
-- Stock: `inStock` es manual en `catalog.json`; no hay descuento automático por venta.
+- Stock: `inStock` es manual (se cambia desde el panel); no hay descuento automático por venta.
+- **`catalog.json` en producción:** el panel lo reescribe, así que tiene que vivir en un disco que persista (con Docker, montarlo como volumen junto con `server/data/`) y no pisarse con un nuevo deploy.
 - El pedido se aprueba por webhook, pero la transferencia con 20 % off sigue su propio circuito (WhatsApp) y no pasa por este server.

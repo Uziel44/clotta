@@ -564,6 +564,9 @@ test('sirve index.html, catalog.json e imágenes permitidas', async () => {
     const catalog = await fetch(`${app.baseUrl}/catalog.json`);
     assert.equal(catalog.status, 200);
     assert.deepEqual(await catalog.json(), FIXTURE_CATALOG);
+    const css = await fetch(`${app.baseUrl}/css/styles.css`);
+    assert.equal(css.status, 200);
+    assert.match(css.headers.get('content-type'), /^text\/css/);
     const img = await fetch(`${app.baseUrl}/img/a.webp`);
     assert.equal(img.status, 200);
     assert.equal(img.headers.get('content-type'), 'image/webp');

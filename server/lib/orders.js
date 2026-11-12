@@ -53,6 +53,9 @@ function createOrderStore(dir) {
       return rows.findLast((row) => row.orderId === orderId) ?? null;
     },
 
+    // Pagos aprobados registrados (para las metricas del panel).
+    listApproved: () => readRows(ordersFile),
+
     recordApproved: (entry) =>
       locked(async () => {
         if (!paidIds) paidIds = new Set((await readRows(ordersFile)).map((row) => String(row.paymentId)));

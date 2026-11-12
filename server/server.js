@@ -1,10 +1,14 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 
+const { createAuth } = require('./lib/auth');
 const { CatalogError, createCatalogLoader } = require('./lib/catalog');
+const { AdminError, createCatalogEditor } = require('./lib/catalog-editor');
+const { createMetricsStore, normalizeEvent, summarize } = require('./lib/metrics');
 const {
   CheckoutError,
   buildOrder,
@@ -19,6 +23,10 @@ const { createRateLimiter } = require('./lib/ratelimit');
 
 const DEFAULT_ALLOWED_ORIGINS = 'http://localhost:5502,http://127.0.0.1:5502';
 const IMAGE_EXTENSIONS = /\.(webp|jpe?g|png|gif|avif|svg)$/i;
+const UPLOADED_FILE = /^\/[a-f0-9]{32}\.(?:jpg|png|webp)$/;
+const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const DAY_MS = 24 * 60 * 60 * 1000;
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const JSON_CONTENT_TYPE = /^application\/(?:[\w.+-]+\+)?json\b/i;
 
 const consoleLogger = Object.fromEntries(
@@ -84,9 +92,18 @@ function createApp({
 
   const getCatalog = createCatalogLoader(catalogPath, logger);
   const orders = createOrderStore(dataDir);
+  const auth = createAuth({ env, logger });
+  const editor = createCatalogEditor({ catalogPath, uploadsDir: path.join(dataDir, 'uploads') });
+  const metrics = createMetricsStore(dataDir, { now });
   const mp = accessToken ? createMpClient({ fetch, accessToken, retryDelayMs }) : null;
   const checkoutLimiter = createRateLimiter({ limit: 20, windowMs: 60_000, now });
   const webhookLimiter = createRateLimiter({ limit: 300, windowMs: 60_000, now });
+  const loginLimiter = createRateLimiter({ limit: 10, windowMs: 15 * 60_000, now });
+  const metricsLimiter = createRateLimiter({ limit: 120, windowMs: 60_000, now }); // de sobra para una persona; corta rafagas automaticas
+
+  // Una vez al dia se descartan los eventos de metricas de mas de 90 dias.
+  metrics.prune().catch((err) => logger.error('metrics.prune_fallo', { reason: err.message }));
+  setInterval(() => metrics.prune().catch(() => {}), DAY_MS).unref();
 
   if (!mp) logger.warn('mp.sin_token', { detail: 'MP_ACCESS_TOKEN no está configurado: /api/checkout responde 503' });
   if (isLocal) logger.warn('mp.public_url_local', { publicUrl, detail: 'sin webhook ni auto_return; para probar el flujo completo usá una URL https (ngrok)' });
@@ -120,12 +137,12 @@ function createApp({
     return next();
   });
 
-  const limit = (limiter, name) => (req, res, next) => {
+  const limit = (limiter, name, message = 'Demasiados intentos. Esperá un minuto y probá de nuevo.') => (req, res, next) => {
     const result = limiter.check(req.ip);
     if (result.ok) return next();
     logger.warn('rate_limit', { route: name, requestId: req.id });
     res.setHeader('Retry-After', String(result.retryAfterSeconds));
-    return res.status(429).json(errorBody('demasiadas_solicitudes', 'Demasiados intentos. Esperá un minuto y probá de nuevo.'));
+    return res.status(429).json(errorBody('demasiadas_solicitudes', message));
   };
 
   const requireJson = (req, res, next) => {
@@ -269,6 +286,61 @@ function createApp({
     return res.json({ ok: true, recorded });
   });
 
+  // --- Metricas: la pagina manda eventos anonimos, el panel los resume ---------
+  app.post('/api/metrics', limit(metricsLimiter, 'metrics'), requireJson, express.json({ limit: '4kb', strict: true }), (req, res) => {
+    const event = normalizeEvent(req.body, now());
+    if (!event) return res.status(400).json(errorBody('evento_invalido', 'Evento inválido.'));
+    metrics.record(event).catch((err) => logger.error('metrics.no_guardado', { reason: err.message }));
+    return res.status(201).json({ ok: true });
+  });
+
+  // --- Panel (admin.html): un usuario, sesion con JWT ---------------------------
+  app.post(
+    '/api/login',
+    limit(loginLimiter, 'login', 'Demasiados intentos. Probá de nuevo en unos minutos.'),
+    requireJson,
+    express.json({ limit: '4kb', strict: true }),
+    async (req, res) => {
+      if (!auth.enabled) {
+        return res.status(503).json(errorBody('panel_no_configurado', 'El panel todavía no está habilitado en el servidor.'));
+      }
+      const { usuario, password } = isObject(req.body) ? req.body : {};
+      const token = await auth.login(usuario, password);
+      if (!token) {
+        // No se loguea el usuario tipeado: a veces es la contrasena escrita en el campo equivocado.
+        logger.warn('admin.login_fallido', { requestId: req.id });
+        return res.status(401).json(errorBody('credenciales_invalidas', 'Usuario o contraseña incorrectos.'));
+      }
+      logger.info('admin.login', { requestId: req.id });
+      return res.json({ token });
+    },
+  );
+
+  const admin = express.Router();
+  admin.use((req, res, next) => {
+    if (!auth.enabled) return res.status(503).json(errorBody('panel_no_configurado', 'El panel todavía no está habilitado en el servidor.'));
+    if (!auth.isValidRequest(req)) return res.status(401).json(errorBody('no_autorizado', 'La sesión no es válida o caducó. Iniciá sesión de nuevo.'));
+    return next();
+  });
+  admin.get('/catalog', (req, res) => res.json(editor.view()));
+  admin.post('/products', requireJson, jsonBody, async (req, res) => res.status(201).json(await editor.create(req.body)));
+  admin.put('/products/:id', requireJson, jsonBody, async (req, res) => res.json(await editor.update(req.params.id, req.body)));
+  admin.delete('/products/:id', async (req, res) => {
+    await editor.remove(req.params.id);
+    res.json({ ok: true });
+  });
+  admin.post('/images', (req, res, next) => {
+    if (!req.is(UPLOAD_TYPES)) return res.status(415).json(errorBody('tipo_no_soportado', 'Subí una imagen JPG, PNG o WebP.'));
+    return next();
+  }, express.raw({ type: UPLOAD_TYPES, limit: '8mb' }), async (req, res) => {
+    res.status(201).json({ url: await editor.saveImage(req.body) });
+  });
+  admin.get('/metrics', async (req, res) => {
+    const productNames = new Map(editor.view().products.map((p) => [p.id, p.name]));
+    res.json(summarize({ events: metrics.readEvents(), orders: await orders.listApproved(), productNames, now: now() }));
+  });
+  app.use('/api/admin', admin);
+
   app.use('/api', (req, res) => {
     res.status(404).json(errorBody('no_encontrado', 'Ruta inexistente.'));
   });
@@ -280,14 +352,34 @@ function createApp({
     ['/', 'index.html'],
     ['/index.html', 'index.html'],
     ['/catalog.json', 'catalog.json'],
+    ['/css/styles.css', 'css/styles.css'],
+    ['/metricas.js', 'metricas.js'],
+    ['/admin.html', 'admin.html'],
+    ['/admin.css', 'admin.css'],
+    ['/admin.js', 'admin.js'],
   ]);
 
   app.get([...PUBLIC_FILES.keys()], (req, res) => {
-    const file = path.join(rootDir, PUBLIC_FILES.get(req.path));
-    res.sendFile(file, { dotfiles: 'allow', headers: { 'Cache-Control': 'no-cache' } }, (err) => {
+    // /catalog.json sale de catalogPath: en produccion vive en el volumen de datos (ver CATALOG_PATH).
+    const file = req.path === '/catalog.json' ? catalogPath : path.join(rootDir, PUBLIC_FILES.get(req.path));
+    const headers = { 'Cache-Control': 'no-cache', ...(req.path === '/admin.html' ? { 'X-Robots-Tag': 'noindex, nofollow' } : {}) };
+    res.sendFile(file, { dotfiles: 'allow', headers }, (err) => {
       if (err && !res.headersSent) res.status(err.statusCode === 404 ? 404 : 500).end();
     });
   });
+
+  // Imagenes subidas desde el panel: nombre aleatorio e inmutable, asi que cache largo.
+  app.use(
+    '/uploads',
+    (req, res, next) => (UPLOADED_FILE.test(req.path) ? next() : res.status(404).end()),
+    express.static(path.join(dataDir, 'uploads'), {
+      dotfiles: 'ignore',
+      index: false,
+      redirect: false,
+      maxAge: '365d',
+      immutable: true,
+    }),
+  );
 
   app.use(
     '/img',
@@ -308,10 +400,10 @@ function createApp({
   // --- Errores ----------------------------------------------------------------
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
-    if (err instanceof CheckoutError) {
+    if (err instanceof CheckoutError || err instanceof AdminError) {
       return res.status(err.status).json({ ...errorBody(err.code, err.message), ...(err.field ? { field: err.field } : {}) });
     }
-    if (err.type === 'entity.too.large') return res.status(413).json(errorBody('body_demasiado_grande', 'El pedido es demasiado grande.'));
+    if (err.type === 'entity.too.large') return res.status(413).json(errorBody('body_demasiado_grande', 'El pedido o el archivo es demasiado grande.'));
     if (err.type === 'entity.parse.failed' || err.type === 'encoding.unsupported' || err.type === 'charset.unsupported') {
       return res.status(400).json(errorBody('json_invalido', 'El cuerpo no es un JSON válido.'));
     }
@@ -330,7 +422,19 @@ function start() {
   }
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || '127.0.0.1';
-  const app = createApp();
+  // En produccion el panel reescribe el catalogo, que tiene que sobrevivir a cada deploy: CATALOG_PATH lo
+  // apunta al volumen de datos y, la primera vez, se siembra con el catalog.json que trae la imagen.
+  let catalogPath;
+  if (process.env.CATALOG_PATH) {
+    catalogPath = path.resolve(process.env.CATALOG_PATH);
+    const seed = path.resolve(__dirname, '..', 'catalog.json');
+    if (!fs.existsSync(catalogPath)) {
+      fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
+      fs.copyFileSync(seed, catalogPath);
+      consoleLogger.info('catalog.sembrado', { from: 'catalog.json de la imagen' });
+    }
+  }
+  const app = createApp({ catalogPath });
   const server = app.listen(port, host, () => {
     consoleLogger.info('server.listening', { url: `http://${host}:${port}` });
   });

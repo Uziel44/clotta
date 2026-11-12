@@ -39,7 +39,9 @@ function cartBody(items, extra = {}) {
 function makeFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clotta-test-'));
   fs.mkdirSync(path.join(root, 'img'));
+  fs.mkdirSync(path.join(root, 'css'));
   fs.mkdirSync(path.join(root, 'server'));
+  fs.writeFileSync(path.join(root, 'css', 'styles.css'), 'body{margin:0}');
   fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><title>Clotta</title>');
   fs.writeFileSync(path.join(root, 'catalog.json'), JSON.stringify(FIXTURE_CATALOG));
   fs.writeFileSync(path.join(root, 'img', 'a.webp'), 'webp-bytes');
