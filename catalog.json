@@ -44,7 +44,16 @@
     ],
     "reels": [
       {
-        "url": "https://www.instagram.com/p/DdrIry9SJTk/"
+        "url": "https://www.instagram.com/p/DdrIry9SJTk/",
+        "cover": "img/chaquetabomberchecks_1_cuadch-882c5ed040b11e7b3717897371183197-1024-1024.webp"
+      },
+      {
+        "url": "https://www.instagram.com/p/De1lciDhDjr/",
+        "cover": "img/blazermolina_2-d4582c70be9c141dfb17907743532673-1024-1024.webp"
+      },
+      {
+        "url": "https://www.instagram.com/p/Ddg-iMGBXWB/",
+        "cover": "img/jeanslightdenim_1-1797fd709ea32c658d17880459394149-1024-1024.webp"
       }
     ]
   },

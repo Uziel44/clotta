@@ -466,3 +466,24 @@ test('/catalog.json se sirve desde catalogPath aunque esté fuera de la raíz, y
     await app.close();
   }
 });
+
+test('syncRepoSections: copia tienda, categorías y portada del repo sin tocar los productos del volumen', () => {
+  const { syncRepoSections } = require('../lib/catalog');
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'clotta-sync-'));
+  const seed = path.join(dir, 'seed.json');
+  const live = path.join(dir, 'live.json');
+  const base = { store: { transferDiscount: 0.2 }, categories: [{ id: 'a', name: 'A' }], editorial: { reels: [{ url: 'u1' }] }, products: [{ id: 'p', price: 1 }] };
+  fs.writeFileSync(live, JSON.stringify(base));
+  // el repo cambió la portada y la tienda; el panel había cambiado el precio del producto
+  fs.writeFileSync(seed, JSON.stringify({ ...base, store: { transferDiscount: 0.15 }, editorial: { reels: [{ url: 'u1' }, { url: 'u2' }] }, products: [{ id: 'p', price: 999 }, { id: 'nuevo', price: 5 }] }));
+  const liveEdited = { ...base, products: [{ id: 'p', price: 50 }] };
+  fs.writeFileSync(live, JSON.stringify(liveEdited));
+
+  assert.equal(syncRepoSections(seed, live), true);
+  const out = JSON.parse(fs.readFileSync(live, 'utf8'));
+  assert.equal(out.store.transferDiscount, 0.15);
+  assert.equal(out.editorial.reels.length, 2);
+  assert.deepEqual(out.products, [{ id: 'p', price: 50 }]);
+  assert.equal(syncRepoSections(seed, live), false, 'sin cambios no reescribe');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

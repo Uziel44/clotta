@@ -57,4 +57,22 @@ function createCatalogLoader(filePath, log = {}) {
   };
 }
 
-module.exports = { CatalogError, parseCatalog, createCatalogLoader };
+// En produccion el catalogo vive en el volumen de datos y el panel solo edita "products". El resto
+// (tienda, categorias, textos y videos de la portada) lo manda el repo: en cada arranque se copia del
+// catalog.json que trae la imagen, sin tocar los productos. Devuelve true si hubo cambios.
+function syncRepoSections(seedPath, livePath) {
+  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+  const live = JSON.parse(fs.readFileSync(livePath, 'utf8'));
+  const next = { ...live };
+  for (const key of Object.keys(seed)) {
+    if (key !== 'products') next[key] = seed[key];
+  }
+  if (JSON.stringify(next) === JSON.stringify(live)) return false;
+  const tmp = `${livePath}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}
+`);
+  fs.renameSync(tmp, livePath);
+  return true;
+}
+
+module.exports = { CatalogError, parseCatalog, createCatalogLoader, syncRepoSections };

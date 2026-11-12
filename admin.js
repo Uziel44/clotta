@@ -153,45 +153,66 @@
       transferDiscount = data.transferDiscount || 0;
       renderList();
     } catch (err) {
-      if (!expired(err)) { say(messageOf(err)); list.replaceChildren(el('li', 'msg', messageOf(err))); }
+      if (!expired(err)) { say(messageOf(err)); list.replaceChildren(el('p', 'msg', messageOf(err))); }
     } finally {
       loading.hidden = true;
     }
     panel.hidden = false;
   }
 
-  const categoryName = (id) => (categories.find((c) => c.id === id) || {}).name || id;
-
+  // Una sección por categoría, en el orden del catálogo; los productos con una categoría que ya no existe van al final.
   function renderList() {
     list.replaceChildren();
     empty.hidden = products.length > 0;
-    products.forEach((p) => {
-      const li = el('li', 'card' + (p.inStock === false ? ' out' : ''));
-      const thumb = el('div', 'thumb');
-      if (safeImg(p.images && p.images[0])) thumb.style.backgroundImage = `url("${p.images[0]}")`;
-      const info = el('div');
-      const h = el('h3', undefined, p.name);
-      if (p.featured) h.append(el('span', 'tag', 'destacado'));
-      if (p.inStock === false) h.append(el('span', 'tag', 'sin stock'));
-      const extras = [];
-      if (p.colors && p.colors.length) extras.push(p.colors.join(', '));
-      if (p.sizes && p.sizes.length) extras.push(`talles ${p.sizes.join(', ')}`);
-      info.append(
-        h,
-        el('div', 'meta', [categoryName(p.category), ...extras].join(' · ')),
-        el('div', 'price', money(p.price)),
-      );
-      const actions = el('div', 'card-actions');
-      const edit = el('button', 'btn ghost', 'Editar');
-      edit.type = 'button';
-      edit.addEventListener('click', () => openEditor(p));
-      const del = el('button', 'btn ghost', 'Eliminar');
-      del.type = 'button';
-      del.addEventListener('click', () => askDelete(p));
-      actions.append(edit, del);
-      li.append(thumb, info, actions);
-      list.append(li);
+    if (!products.length) return;
+    const groups = categories.map((c) => ({ id: c.id, name: c.name, items: products.filter((p) => p.category === c.id) }));
+    const orphans = products.filter((p) => !categories.some((c) => c.id === p.category));
+    if (orphans.length) groups.push({ id: '', name: 'Sin categoría', items: orphans });
+
+    groups.forEach((g) => {
+      const section = el('section', 'cat');
+      section.setAttribute('aria-label', g.name);
+      const head = el('div', 'cat-head');
+      const title = el('h3', undefined, g.name);
+      title.append(el('span', 'count', `${g.items.length} ${g.items.length === 1 ? 'producto' : 'productos'}`));
+      head.append(title);
+      if (g.id) {
+        const add = el('button', 'btn ghost', '+ Agregar');
+        add.type = 'button';
+        add.setAttribute('aria-label', `Agregar un producto a ${g.name}`);
+        add.addEventListener('click', () => openEditor(null, g.id));
+        head.append(add);
+      }
+      const cards = el('ul', 'cards');
+      if (!g.items.length) cards.append(el('li', 'muted small', 'Todavía no hay productos en esta categoría.'));
+      g.items.forEach((p) => cards.append(productCard(p)));
+      section.append(head, cards);
+      list.append(section);
     });
+  }
+
+  function productCard(p) {
+    const li = el('li', 'card' + (p.inStock === false ? ' out' : ''));
+    const thumb = el('div', 'thumb');
+    if (safeImg(p.images && p.images[0])) thumb.style.backgroundImage = `url("${p.images[0]}")`;
+    const info = el('div');
+    const h = el('h4', undefined, p.name);
+    if (p.featured) h.append(el('span', 'tag', 'destacado'));
+    if (p.inStock === false) h.append(el('span', 'tag', 'sin stock'));
+    const extras = [];
+    if (p.colors && p.colors.length) extras.push(p.colors.join(', '));
+    if (p.sizes && p.sizes.length) extras.push(`talles ${p.sizes.join(', ')}`);
+    info.append(h, el('div', 'meta', extras.join(' · ')), el('div', 'price', money(p.price)));
+    const actions = el('div', 'card-actions');
+    const edit = el('button', 'btn ghost', 'Editar');
+    edit.type = 'button';
+    edit.addEventListener('click', () => openEditor(p));
+    const del = el('button', 'btn ghost', 'Eliminar');
+    del.type = 'button';
+    del.addEventListener('click', () => askDelete(p));
+    actions.append(edit, del);
+    li.append(thumb, info, actions);
+    return li;
   }
 
   // ---- Editor ----
@@ -240,14 +261,15 @@
     $('label[for="f-fotos"]').hidden = images.length >= MAX_IMAGES;
   }
 
-  function openEditor(p) {
+  // categoryId: para un producto nuevo creado desde el botón "+ Agregar" de una categoría.
+  function openEditor(p, categoryId) {
     editing = p || null;
     releaseImages();
     $('#editor-titulo').textContent = p ? 'Editar producto' : 'Nuevo producto';
     $('#f-nombre').value = p ? p.name : '';
     const select = $('#f-categoria');
     select.replaceChildren(...categories.map((c) => { const o = el('option', undefined, c.name); o.value = c.id; return o; }));
-    select.value = p ? p.category : (categories[0] || {}).id || '';
+    select.value = p ? p.category : categoryId || (categories[0] || {}).id || '';
     $('#f-precio').value = p ? p.price : '';
     $('#f-descripcion').value = p ? (p.description || '') : '';
     $('#f-colores').value = p ? (p.colors || []).join(', ') : '';
@@ -268,7 +290,8 @@
 
   $('#nuevo').addEventListener('click', () => openEditor(null));
   $('#editor-cancelar').addEventListener('click', () => editor.close());
-  editor.addEventListener('close', () => { releaseImages(); images = []; });
+  // El evento "close" llega después de cerrar: si el editor ya se volvió a abrir, no hay que vaciar sus imágenes.
+  editor.addEventListener('close', () => { if (!editor.open) { releaseImages(); images = []; } });
 
   // Redimensiona en el navegador antes de subir (las fotos del celular pesan mucho). Sale en WebP; si el navegador no lo soporta, en JPG.
   const toBlob = (canvas, type) => new Promise((resolve) => canvas.toBlob(resolve, type, IMG_QUALITY));

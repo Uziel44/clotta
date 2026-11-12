@@ -109,7 +109,7 @@ Estos archivos son los **únicos** lugares con datos personales. Privacidad: ema
 
 ## Seguridad en una mirada
 
-- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/css/styles.css`, `/metricas.js`, `/admin.html`, `/admin.css`, `/admin.js`, `/img/*.{webp,jpg,png,gif,avif,svg}` y `/uploads/<32 hex>.{jpg,png,webp}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
+- Sitio servido con **whitelist** (`/`, `/index.html`, `/catalog.json`, `/css/styles.css`, `/app.js`, `/metricas.js`, `/admin.html`, `/admin.css`, `/admin.js`, `/img/*.{webp,jpg,png,gif,avif,svg}` y `/uploads/<32 hex>.{jpg,png,webp}`). `server/.env`, los PDF y `bench/` dan 404. Si el front agrega otro archivo público en la raíz, sumarlo a `PUBLIC_FILES` en `server.js`.
 - Token y secret solo por entorno; los logs los redactan. Rate limit 20/min por IP en checkout. Cabeceras básicas (`nosniff`, `frame-ancestors 'none'`, HSTS si `PUBLIC_URL` es https).
 - Webhook: firma HMAC-SHA256 (`x-signature`) con comparación en tiempo constante; el payload no se usa, el estado se consulta a Mercado Pago. Ante un fallo de Mercado Pago responde 502 para que **reintente él**.
 

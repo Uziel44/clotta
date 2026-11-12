@@ -16,7 +16,7 @@ COPY server/lib ./lib
 
 # La web: server.js la busca en la carpeta de arriba (/app). Solo lo publico (ver PUBLIC_FILES en server.js).
 WORKDIR /app
-COPY index.html catalog.json admin.html admin.css admin.js metricas.js ./
+COPY index.html app.js catalog.json admin.html admin.css admin.js metricas.js ./
 COPY css ./css
 COPY img ./img
 

@@ -32,8 +32,8 @@ body {
 .top { background: var(--navy); color: var(--paper); }
 .top :focus-visible { outline-color: var(--paper); }
 .top-inner { max-width: 980px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; letter-spacing: .22em; }
-.brand span { display: block; font-family: var(--font-ui); font-weight: 400; font-size: .7rem; letter-spacing: .04em; color: #B9C3D6; }
+.brand img { display: block; height: 44px; width: auto; filter: invert(1); } /* el logo es negro: sobre el azul se muestra blanco */
+.brand span { display: block; font-size: .7rem; letter-spacing: .04em; color: #B9C3D6; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 .top .link { color: #D5DCE8; font-size: .85rem; }
 .top .btn.ghost { color: var(--paper); border-color: rgba(244, 243, 239, .4); }
@@ -81,12 +81,20 @@ textarea { resize: vertical; line-height: 1.5; }
 
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 
+/* Categorías: una sección después de otra */
+.cat { margin-top: 32px; }
+.cat:first-child { margin-top: 20px; }
+.cat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--navy); }
+.cat-head h3 { font-family: var(--font-display); font-weight: 500; font-size: 1.4rem; margin: 0; }
+.cat-head .count { font-family: var(--font-ui); font-size: .78rem; font-weight: 400; color: var(--muted); margin-left: 10px; }
+.cat-head .btn { min-height: 36px; padding: 6px 14px; font-size: .82rem; }
+
 /* Tarjetas */
-.cards { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.cards { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 12px; }
 .card { display: grid; grid-template-columns: 84px 1fr auto; gap: 14px; align-items: center; background: var(--white); border: 1px solid var(--line); padding: 12px; }
 .card.out { opacity: .65; }
 .thumb { width: 84px; aspect-ratio: 3 / 4; background: var(--mist) center / cover no-repeat; }
-.card h3 { font-family: var(--font-display); font-weight: 500; font-size: 1.1rem; margin: 0 0 3px; }
+.card h4 { font-family: var(--font-display); font-weight: 500; font-size: 1.1rem; margin: 0 0 3px; }
 .card .meta { font-size: .8rem; color: var(--muted); }
 .card .price { font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .tag { display: inline-block; font-family: var(--font-ui); font-size: .68rem; font-weight: 600; border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; margin-left: 6px; vertical-align: middle; }

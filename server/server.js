@@ -6,7 +6,7 @@ const path = require('node:path');
 const express = require('express');
 
 const { createAuth } = require('./lib/auth');
-const { CatalogError, createCatalogLoader } = require('./lib/catalog');
+const { CatalogError, createCatalogLoader, syncRepoSections } = require('./lib/catalog');
 const { AdminError, createCatalogEditor } = require('./lib/catalog-editor');
 const { createMetricsStore, normalizeEvent, summarize } = require('./lib/metrics');
 const {
@@ -353,6 +353,7 @@ function createApp({
     ['/index.html', 'index.html'],
     ['/catalog.json', 'catalog.json'],
     ['/css/styles.css', 'css/styles.css'],
+    ['/app.js', 'app.js'],
     ['/metricas.js', 'metricas.js'],
     ['/admin.html', 'admin.html'],
     ['/admin.css', 'admin.css'],
@@ -423,7 +424,8 @@ function start() {
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || '127.0.0.1';
   // En produccion el panel reescribe el catalogo, que tiene que sobrevivir a cada deploy: CATALOG_PATH lo
-  // apunta al volumen de datos y, la primera vez, se siembra con el catalog.json que trae la imagen.
+  // apunta al volumen de datos. La primera vez se siembra con el catalog.json que trae la imagen y, despues,
+  // en cada arranque se actualizan desde ahi todas las secciones menos los productos.
   let catalogPath;
   if (process.env.CATALOG_PATH) {
     catalogPath = path.resolve(process.env.CATALOG_PATH);
@@ -432,6 +434,12 @@ function start() {
       fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
       fs.copyFileSync(seed, catalogPath);
       consoleLogger.info('catalog.sembrado', { from: 'catalog.json de la imagen' });
+    } else {
+      try {
+        if (syncRepoSections(seed, catalogPath)) consoleLogger.info('catalog.secciones_actualizadas', { detail: 'tienda, categorias y portada tomadas del repo; los productos no se tocan' });
+      } catch (err) {
+        consoleLogger.error('catalog.sync_fallo', { reason: err.message });
+      }
     }
   }
   const app = createApp({ catalogPath });
