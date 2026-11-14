@@ -5,6 +5,7 @@ const API = window.CLOTTA_API ?? (location.port === '5502' ? 'http://localhost:3
 const KEYS = { cart: 'clotta.cart.v1', favs: 'clotta.favs.v1', buyer: 'clotta.buyer.v1' };
 const WA_FALLBACK = '543516176285'; // solo hasta que cargue catalog.json (aviso de retorno de pago)
 const MAX_QTY = 10;
+const WA_MAX_CHARS = 1800; // más largo que esto, WhatsApp puede cortar el mensaje
 const track = (tipo, datos) => window.Metricas?.track(tipo, datos); // metricas.js carga con defer
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -41,13 +42,17 @@ const pageFor = id => (id === 'all' ? 'coleccion.html' : `${id}.html`);
 
 /* ---------- Helpers de dominio ---------- */
 const money = n => S.money.format(n);
+const hasPrice = p => Number.isFinite(p.price) && p.price > 0; // sin precio = "a consultar" por WhatsApp
 const tPrice = p => Math.round(p * (1 - (S.store.transferDiscount ?? 0)));
 const pct = () => Math.round((S.store.transferDiscount ?? 0) * 100);
 const inStock = p => p.inStock !== false;
 const byStock = (a, b) => inStock(b) - inStock(a); // sin stock al final (sort estable)
+const noteText = () => S.store.itemNote ?? ''; // aviso opcional de la ficha (store.itemNote en catalog.json)
+const hasQuoteLines = () => S.cart.some(l => !hasPrice(S.byId.get(l.id)));
 const needsChoice = p => (p.sizes?.length || 0) > 1 || (p.colors?.length || 0) > 1;
 const catName = id => S.categories.find(c => c.id === id)?.name || '';
 const keyOf = l => [l.id, l.size || '', l.color || ''].join('|');
+const place = () => S.store.address || S.store.city || '';
 const waLink = text => `https://wa.me/${S.store.whatsapp || WA_FALLBACK}${text ? '?text=' + encodeURIComponent(text) : ''}`;
 const announce = msg => { const l = $('#live'); l.textContent = ''; setTimeout(() => { l.textContent = msg; }, 40); };
 const icon = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
@@ -67,7 +72,7 @@ function hydrate(data) {
   S.store = data.store || {};
   S.categories = data.categories || [];
   S.editorial = data.editorial || {};
-  S.products = (data.products || []).filter(p => p && p.id && p.name && Number.isFinite(p.price));
+  S.products = (data.products || []).filter(p => p && p.id && p.name);
   S.byId = new Map(S.products.map(p => [p.id, p]));
   S.money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: S.store.currency || 'ARS', maximumFractionDigits: 0 });
   S.cart = sanitizeCart(storage.get(KEYS.cart, []));
@@ -172,15 +177,18 @@ function renderNav() {
   updateNavFade();
 }
 
-// El precio de lista solo se muestra en la ficha (popup del producto); las tarjetas no llevan precio y el valor por transferencia va en el carrito.
+// Precio de la ficha del producto (popup). La tarjeta arma el suyo en cardHTML.
 function priceHTML(p) {
-  return `<p class="price"><span class="price__list">${money(p.price)}</span></p>`;
+  return `<p class="price"><span class="price__list">${hasPrice(p) ? money(p.price) : 'Precio a consultar'}</span></p>`;
 }
 
 function cardHTML(p) {
   const [a, b] = p.images || [];
   const fav = S.favs.has(p.id);
-  const out = !inStock(p);
+  const priced = hasPrice(p);
+  const out = priced && !inStock(p);
+  const n = S.store.installments ?? 0;
+  // Debajo de la foto: nombre, corazón, precio, cuotas, transferencia y botón.
   return `<article class="card${out ? ' is-out' : ''}" data-pid="${esc(p.id)}">
     <div class="card__media">
       <button class="card__img" type="button" data-act="open" tabindex="-1" aria-hidden="true">
@@ -188,13 +196,14 @@ function cardHTML(p) {
         ${b ? `<img class="card__alt" src="${esc(b)}" alt="" width="480" height="640" loading="lazy" decoding="async">` : ''}
       </button>
       ${out ? '<span class="badge">Sin stock</span>' : ''}
-      <button class="fav" type="button" data-act="fav" aria-pressed="${fav}" aria-label="Guardar ${esc(p.name)} en favoritos">${icon('heart')}</button>
     </div>
     <div class="card__info">
-      <div class="card__row">
-        <h3 class="card__title"><button class="card__name" type="button" data-act="open">${esc(p.name)}</button></h3>
-        <button class="quick" type="button" data-act="quick"${out ? ' disabled' : ''} aria-label="${needsChoice(p) ? 'Elegir talle y color de' : 'Agregar al carrito:'} ${esc(p.name)}">${icon('bag')}</button>
-      </div>
+      <h3 class="card__title"><button class="card__name" type="button" data-act="open">${esc(p.name)}</button></h3>
+      <button class="fav" type="button" data-act="fav" aria-pressed="${fav}" aria-label="Guardar ${esc(p.name)} en favoritos">${icon('heart')}</button>
+      <p class="card__price">${priced ? money(p.price) : 'Precio a consultar'}</p>
+      ${priced && n > 1 ? `<p class="card__sub">En <b>${n}</b> cuotas sin interés de <b>${money(Math.round(p.price / n))}</b></p>` : ''}
+      ${priced && pct() > 0 ? `<p class="card__sub">${pct()}% menos por transferencia: <b>${money(tPrice(p.price))}</b></p>` : ''}
+      <button class="btn btn--sm card__add" type="button" data-act="add"${out ? ' disabled' : ''}>Comprar</button>
     </div>
   </article>`;
 }
@@ -209,8 +218,8 @@ function visibleProducts() {
   const { cat, favs, sort } = S.filter;
   let list = S.products.filter(p => (cat === 'all' || p.category === cat) && (!favs || S.favs.has(p.id)));
   if (sort === 'featured') list = [...list].sort(byStock);
-  else if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price);
-  else if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price);
+  else if (sort === 'price-asc') list = [...list].sort((a, b) => (hasPrice(a) ? a.price : Infinity) - (hasPrice(b) ? b.price : Infinity) || 0);
+  else if (sort === 'price-desc') list = [...list].sort((a, b) => (hasPrice(b) ? b.price : -1) - (hasPrice(a) ? a.price : -1));
   else if (sort === 'az') list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   return list;
 }
@@ -393,7 +402,7 @@ function optionGroup(name, label, values, disabled = false) {
 
 function productHTML(p) {
   const imgs = p.images || [];
-  const out = !inStock(p);
+  const out = hasPrice(p) && !inStock(p);
   const nColors = p.colorCount || 0;
   return `
     <button class="icon-btn modal__x" type="button" data-act="close" aria-label="Cerrar"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
@@ -411,11 +420,19 @@ function productHTML(p) {
       ${optionGroup('color', 'Color', p.colors, out)}
       ${!p.colors?.length && nColors > 1 ? `<p class="muted">Hay ${nColors} colores. Lo coordinamos con vos por WhatsApp después de tu pedido.</p>` : ''}
       ${optionGroup('size', 'Talle', p.sizes, out)}
+      ${noteText() ? `<p class="muted">${esc(noteText())}</p>` : ''}
       <p class="form-err" id="pdErr" role="alert"></p>
       ${out
         ? `<p class="muted">Sin stock por ahora.</p>
            <a class="btn" href="${esc(waLink(`Hola! Quiero consultar por ${p.name}, que figura sin stock en la web.`))}" target="_blank" rel="noopener">Consultar por WhatsApp<span class="vh"> (se abre en otra pestaña)</span></a>`
-        : '<button class="btn" type="submit">Agregar al carrito</button>'}
+        : `<div class="pbuy">
+            <div class="stepper" role="group" aria-label="Cantidad de ${esc(p.name)}">
+              <button type="button" data-act="pd-dec" aria-label="Quitar una unidad" disabled>${icon('minus')}</button>
+              <output id="pdQty" aria-live="polite">1</output>
+              <button type="button" data-act="pd-inc" aria-label="Sumar una unidad">${icon('plus')}</button>
+            </div>
+            <button class="btn" type="submit">Agregar al carrito</button>
+          </div>`}
     </form>`;
 }
 
@@ -451,10 +468,11 @@ function toggleFav(id) {
 function totals() {
   return S.cart.reduce((t, l) => {
     const p = S.byId.get(l.id);
+    if (!hasPrice(p)) { t.quote += l.qty; return t; } // precio a consultar: no suma
     t.list += p.price * l.qty;
     t.transfer += tPrice(p.price) * l.qty;
     return t;
-  }, { list: 0, transfer: 0 });
+  }, { list: 0, transfer: 0, quote: 0 });
 }
 function saveCart() { storage.set(KEYS.cart, S.cart); renderCounts(); renderCart(); }
 
@@ -465,14 +483,25 @@ function addToCart(p, { size = '', color = '' } = {}, qty = 1) {
   track('agregar_carrito', { productoId: p.id });
   saveCart();
   announce(`${p.name} agregado al carrito.`);
-  toast(`Agregaste ${p.name}.`, { act: 'cart', label: 'Ver carrito' });
+  toast(`Agregaste ${qty > 1 ? `${qty} × ` : ''}${p.name}.`, { act: 'cart', label: 'Ver carrito' });
 }
 
-function quickAdd(id) {
+// Desde la tarjeta se suma 1 unidad; la cantidad se elige en la ficha del producto o en el carrito.
+function addFromCard(id) {
   const p = S.byId.get(id);
-  if (!p || !inStock(p)) return;
-  if (needsChoice(p)) return openProduct(id);
-  addToCart(p, { size: p.sizes?.[0] || '', color: p.colors?.[0] || '' });
+  if (!p || (hasPrice(p) && !inStock(p))) return;
+  if (needsChoice(p)) return openProduct(id); // si el producto tiene varios talles o colores, se elige en la ficha
+  addToCart(p, { size: p.sizes?.[0] || '', color: p.colors?.[0] || '' }, 1);
+}
+
+// Cantidad de la ficha del producto (1 a MAX_QTY).
+function stepModalQty(delta) {
+  const out = $('#pdQty');
+  if (!out) return;
+  const n = Math.min(MAX_QTY, Math.max(1, Number(out.textContent) + delta));
+  out.textContent = n;
+  $('[data-act="pd-dec"]').disabled = n <= 1;
+  $('[data-act="pd-inc"]').disabled = n >= MAX_QTY;
 }
 
 function changeQty(key, delta) {
@@ -511,26 +540,25 @@ function renderCart(focus) {
         <span class="line__name">${esc(p.name)}</span>
         ${variant ? `<span class="line__var">${esc(variant)}</span>` : ''}
         ${inStock(p) ? '' : '<span class="form-err">Sin stock. Quitala para continuar.</span>'}
-        <div class="line__row">
-          <div class="stepper" role="group" aria-label="Cantidad de ${esc(p.name)}">
-            <button type="button" data-cart="dec" aria-label="Quitar una unidad"${l.qty <= 1 ? ' disabled' : ''}>${icon('minus')}</button>
-            <output>${l.qty}</output>
-            <button type="button" data-cart="inc" aria-label="Sumar una unidad"${l.qty >= MAX_QTY ? ' disabled' : ''}>${icon('plus')}</button>
-          </div>
-          <p class="line__price">${money(p.price * l.qty)}<span class="price__t">${money(tPrice(p.price) * l.qty)} transf.</span></p>
-        </div>
-        <button class="link" type="button" data-cart="rm">Quitar</button>
       </div>
+      <div class="stepper" role="group" aria-label="Cantidad de ${esc(p.name)}">
+        <button type="button" data-cart="dec" aria-label="Quitar una unidad"${l.qty <= 1 ? ' disabled' : ''}>${icon('minus')}</button>
+        <output>${l.qty}</output>
+        <button type="button" data-cart="inc" aria-label="Sumar una unidad"${l.qty >= MAX_QTY ? ' disabled' : ''}>${icon('plus')}</button>
+      </div>
+      <p class="line__unit">${hasPrice(p) ? money(p.price) : ''}</p>
+      <p class="line__total">${hasPrice(p) ? money(p.price * l.qty) : 'A consultar'}</p>
+      <button class="icon-btn line__rm" type="button" data-cart="rm" aria-label="Quitar ${esc(p.name)} del carrito">${icon('trash')}</button>
     </li>`;
   }).join('')}</ul>`;
   const t = totals();
   const blocked = outLines.length > 0;
   foot.innerHTML = `
-    <div class="totals">
+    ${t.list > 0 ? `<div class="totals">
       <div><span>Total con tarjeta</span><span>${money(t.list)}</span></div>
       <div class="t-big"><span>Total por transferencia (−${pct()}%)</span><span>${money(t.transfer)}</span></div>
-    </div>
-    <p class="pay-note">En el próximo paso elegís retiro en el local o envío.</p>
+    </div>` : ''}
+    <p class="pay-note">${t.quote > 0 ? 'Precios, talles y colores los coordinamos por WhatsApp.' : 'En el próximo paso elegís retiro en el local o envío.'}</p>
     <button class="btn" type="button" data-cart="next"${blocked ? ' disabled' : ''}>Continuar</button>`;
   if (focus) {
     const el = $(`[data-key="${CSS.escape(focus.key)}"] [data-cart="${focus.act}"]:not([disabled])`) || $('#cartBody .stepper button:not([disabled])');
@@ -544,10 +572,10 @@ function showCartError(html) {
 }
 
 function orderLines() {
-  return S.cart.map(l => {
+  return S.cart.map((l, i) => {
     const p = S.byId.get(l.id);
     const v = [l.size && `talle ${l.size}`, l.color && `color ${l.color}`].filter(Boolean).join(', ');
-    return `• ${l.qty} × ${p.name}${v ? ` (${v})` : ''}`;
+    return `${i + 1}) ${p.name}${v ? ` (${v})` : ''} - ${l.qty} ${l.qty === 1 ? 'unidad' : 'unidades'} - ${hasPrice(p) ? money(p.price * l.qty) : 'a consultar'}`;
   }).join('\n');
 }
 
@@ -585,14 +613,14 @@ function renderDetails() {
       <fieldset class="fset">
         <legend>Tus datos</legend>
         ${fieldHTML({ id: 'name', label: 'Nombre y apellido', ac: 'name', max: 80, value: d.name })}
-        ${fieldHTML({ id: 'email', label: 'Email', type: 'email', ac: 'email', mode: 'email', value: d.email })}
+        ${fieldHTML({ id: 'email', label: 'Email', type: 'email', ac: 'email', mode: 'email', value: d.email, opt: hasQuoteLines() })}
         ${fieldHTML({ id: 'phone', label: 'Teléfono o WhatsApp', type: 'tel', ac: 'tel', mode: 'tel', max: 20, value: d.phone, hint: 'Con código de área, por ejemplo 351 6176285.' })}
         <p class="hint">Guardamos nombre, email y teléfono solo en tu navegador, para tu próxima compra. La dirección no se guarda.</p>
       </fieldset>
       <fieldset class="fset" aria-describedby="method-err">
         <legend>Entrega</legend>
         <div class="deliv">
-          <label class="opt-card"><input type="radio" name="delivery" value="retiro"${env ? '' : ' checked'}><span class="opt-card__t">Retiro en el local</span><span class="opt-card__d">${esc(S.store.address || '')}</span></label>
+          <label class="opt-card"><input type="radio" name="delivery" value="retiro"${env ? '' : ' checked'}><span class="opt-card__t">Retiro en el local</span><span class="opt-card__d">${esc(place())}</span></label>
           <label class="opt-card"><input type="radio" name="delivery" value="envio"${env ? ' checked' : ''}><span class="opt-card__t">Envío a domicilio</span><span class="opt-card__d">A todo el país.</span></label>
         </div>
         <p class="field-err" id="method-err"></p>
@@ -605,6 +633,15 @@ function renderDetails() {
         ${fieldHTML({ id: 'notes', label: 'Notas para la entrega', opt: true, area: true, max: 200, value: d.notes })}
       </fieldset>
     </form>`;
+  if (t.quote > 0) { // hay prendas con precio a consultar: el pedido se coordina por WhatsApp
+    foot.innerHTML = `
+    ${t.list > 0 ? `<div class="totals"><div><span>Subtotal de prendas con precio</span><span>${money(t.list)}</span></div></div>` : ''}
+    <div class="err" id="cartErr" role="alert"></div>
+    <button class="btn" type="submit" form="checkoutForm" id="waBtn">${icon('chat')} Enviar pedido por WhatsApp</button>
+    <p class="pay-note pay-note--tight">Te respondemos con precios, talles y colores disponibles, y coordinamos el pago y la entrega.</p>`;
+    body.scrollTop = 0;
+    return;
+  }
   foot.innerHTML = `
     <div class="totals">
       <div><span>Total con tarjeta</span><span>${money(t.list)}</span></div>
@@ -627,7 +664,7 @@ function validateDraft(d) {
   const name = d.name.trim(), phone = d.phone.trim(), zip = d.zip.trim(), number = d.number.trim();
   if (name.length < 3 || name.split(/\s+/).length < 2) e.name = 'Escribí tu nombre y apellido.';
   else if (UNSAFE_RE.test(name)) e.name = 'El nombre no puede incluir < ni >.';
-  if (!EMAIL_RE.test(d.email.trim())) e.email = 'Revisá el email: tiene que ser como nombre@correo.com.';
+  if (d.email.trim() ? !EMAIL_RE.test(d.email.trim()) : !hasQuoteLines()) e.email = 'Revisá el email: tiene que ser como nombre@correo.com.';
   if (!PHONE_RE.test(phone) || phone.replace(/\D/g, '').length < 6) e.phone = 'Revisá el teléfono: solo números, con código de área, por ejemplo 351 6176285.';
   if (d.method === 'envio') {
     if (d.street.trim().length < 2) e.street = 'Escribí la calle.';
@@ -676,16 +713,22 @@ function readCheckout() {
 
 function orderMessage(c, mode) {
   const t = totals(), a = c.delivery.address;
-  const entrega = a ? `Envío a domicilio: ${a.street} ${a.number}, ${a.city}, ${a.province} (CP ${a.zip})` : `Retiro en el local (${S.store.address})`;
+  const entrega = a ? `Envío a domicilio: ${a.street} ${a.number}, ${a.city}, ${a.province} (CP ${a.zip})` : `Retiro en el local (${place()})`;
+  const head = mode === 'transfer' ? `Hola CLOTTA! Quiero pagar este pedido por transferencia (${pct()}% de descuento):`
+    : mode === 'pedido' ? 'Hola CLOTTA! Quiero hacer este pedido:'
+    : 'Hola CLOTTA! Quiero comprar este pedido (el pago online no estaba disponible):';
+  const total = mode === 'transfer' ? `Total por transferencia: ${money(t.transfer)}`
+    : mode === 'pedido' ? (t.list > 0 ? `Subtotal de las prendas con precio: ${money(t.list)}` : null)
+    : `Total: ${money(t.list)}`;
   return [
-    mode === 'transfer' ? `Hola CLOTTA! Quiero pagar este pedido por transferencia (${pct()}% de descuento):` : 'Hola CLOTTA! Quiero comprar este pedido (el pago online no estaba disponible):',
+    head,
     '', orderLines(), '',
-    mode === 'transfer' ? `Total por transferencia: ${money(t.transfer)}` : `Total: ${money(t.list)}`,
+    ...(total ? [total] : []),
     '', `Nombre: ${c.buyer.name}`, `Teléfono: ${c.buyer.phone}`, `Entrega: ${entrega}`,
     ...(c.delivery.notes ? [`Notas: ${c.delivery.notes}`] : []),
     ...(a ? ['El costo del envío lo coordinamos antes de despachar.'] : []),
-    '', mode === 'transfer' ? '¿Me pasás los datos para transferir?' : '¿Cómo seguimos?'
-  ].join('\n');
+    '', mode === 'transfer' ? '¿Me pasás los datos para transferir?' : mode === 'pedido' ? '¿Me confirmás disponibilidad, talles, colores y precios?' : '¿Cómo seguimos?'
+  ].join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
 function payTransfer() {
@@ -694,6 +737,20 @@ function payTransfer() {
   track('iniciar_checkout');
   track('click_whatsapp');
   window.open(waLink(orderMessage(c, 'transfer')), '_blank', 'noopener');
+}
+
+function payWhatsApp() {
+  const c = readCheckout();
+  if (!c) return;
+  const link = waLink(orderMessage(c, 'pedido'));
+  if (link.length > WA_MAX_CHARS) {
+    showCartError('<span>El pedido es muy largo y podría cortarse al enviarlo. Hacelo en dos pedidos.</span>');
+    return;
+  }
+  showCartError('');
+  track('iniciar_checkout');
+  track('click_whatsapp');
+  window.open(link, '_blank', 'noopener');
 }
 
 function goStep(step) {
@@ -827,7 +884,8 @@ document.addEventListener('click', e => {
   const id = t.closest('[data-pid]')?.dataset.pid;
   switch (act) {
     case 'open': return openProduct(id);
-    case 'quick': return quickAdd(id);
+    case 'add': return addFromCard(id);
+    case 'pd-inc': case 'pd-dec': return stepModalQty(act === 'pd-inc' ? 1 : -1);
     case 'fav': return toggleFav(id);
     case 'shop': e.preventDefault(); return goAll();
     case 'favs':
@@ -854,7 +912,7 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('submit', e => {
-  if (e.target.id === 'checkoutForm') { e.preventDefault(); payMP($('#mpBtn')); return; }
+  if (e.target.id === 'checkoutForm') { e.preventDefault(); if (hasQuoteLines()) payWhatsApp(); else payMP($('#mpBtn')); return; }
   if (e.target.id !== 'pdForm') return;
   e.preventDefault();
   const form = e.target, p = S.byId.get(form.dataset.pid);
@@ -864,7 +922,7 @@ document.addEventListener('submit', e => {
     form.querySelector(`[data-group="${c.focus}"] input`)?.focus();
     return;
   }
-  addToCart(p, c);
+  addToCart(p, c, Number($('#pdQty')?.textContent) || 1);
   $('#pd').close();
 });
 document.addEventListener('change', e => {
@@ -906,7 +964,7 @@ function injectJSONLD() {
       item: {
         '@type': 'Product', name: p.name, description: p.description || undefined, category: catName(p.category),
         image: (p.images || []).map(abs),
-        offers: { '@type': 'Offer', price: p.price, priceCurrency: st.currency || 'ARS', availability: inStock(p) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' }
+        offers: hasPrice(p) ? { '@type': 'Offer', price: p.price, priceCurrency: st.currency || 'ARS', availability: inStock(p) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' } : undefined
       }
     }))
   }];
